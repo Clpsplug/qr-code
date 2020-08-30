@@ -259,7 +259,7 @@ if __name__ == '__main__':
 
     error_correction_wc = 17
 
-    gf_s = 0b00011101
+    gf_s = 0x1d
     gf_n = 1
 
     nof = np.zeros(shape=256, dtype=int)  # is the exponent (index) to integer (value) conversion
@@ -500,7 +500,8 @@ if __name__ == '__main__':
     metadata = metadata + list(map(lambda i: True if i == 1 else False, meta_fx))
 
     # Then it is XOR'd with 0b101010000010010
-    meta_xor_array = convert_int_to_bool_array(0b101010000010010, 15)
+    # 0b 0101 0100 0001 0010 == 0x5412
+    meta_xor_array = convert_int_to_bool_array(0x5412, 15)
     for i in range(len(metadata)):
         metadata[i] = metadata[i] ^ meta_xor_array[i]
 
