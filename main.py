@@ -240,7 +240,7 @@ if __name__ == '__main__':
             encoded_data = encoded_data + convert_int_to_bool_array(0xec, 8)
             data_codes.append(0xec)
         else:
-            encoded_data = encoded_data + convert_int_to_bool_array(0b11, 8)
+            encoded_data = encoded_data + convert_int_to_bool_array(0x11, 8)
             data_codes.append(0x11)
         count += 1
 
