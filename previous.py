@@ -8,7 +8,6 @@ import csv
 
 import numpy as np
 
-from QR.numpy import QRM
 from QR.value_object import QRModule
 from binary_operations.conversion import convert_int_to_bool_array
 
@@ -28,6 +27,8 @@ if __name__ == '__main__':
     module_size = 21
     # Each "quiet zone (the outer white part)" is 4 blocks wide.
     total_size = 25
+
+    QRM = np.dtype(QRModule)
 
     # Never mind the warning on fill_value, it works.
     buffer = np.full(shape=(module_size, module_size), fill_value=QRModule.null(), dtype=QRM)
@@ -145,6 +146,20 @@ if __name__ == '__main__':
 
     error_correction_wc = 17
 
+    gf_s = 0x1d
+    gf_n = 1
+
+    nof = np.zeros(shape=256, dtype=int)  # is the exponent (index) to integer (value) conversion
+    iof = np.zeros(shape=256, dtype=int)  # is the integer (index) to exponent (value) conversion
+
+    for i in range(255):
+        nof[i] = gf_n % 256
+        iof[gf_n] = i
+
+        gf_n = gf_n << 1
+        gf_n = ((gf_n >> 8) * gf_s) ^ (gf_n & 0xff)
+    iof[0] = -1  # integer 0 cannot be mapped anywhere. So, if -1 is encountered, mark as invalid.
+    nof[255] = gf_n % 256
 
     # for each data code, we divide it by g(x), which is statically defined below AS EXPONENTS.
     # the first element is for x^17. last one for x^0 = 1.
@@ -189,7 +204,7 @@ if __name__ == '__main__':
     # In QR code, 1 module (pixel) means 1 bit. We first binarise the data,
     # then place the bits where they supposed to be.
 
-    # In this example, there are only one RS block. Multiple RS blocks mean we need to interleave the data,
+    # In this example, there are only one RS block, which means we need to interleave the data,
     # but Type-1-H does not require that.
 
     # How do we place the data:
@@ -405,4 +420,4 @@ if __name__ == '__main__':
     with open('output.csv', 'w') as fp:
         writer = csv.writer(fp)
         for i in range(21):
-            writer.writerow(map(lambda m: m.get_as_char(), buffer[i, :]))
+            writer.writerow(map(lambda m: "B" if m.is_black() else "W", buffer[i, :]))
