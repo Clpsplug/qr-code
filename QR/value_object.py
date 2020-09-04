@@ -1,3 +1,6 @@
+from __future__ import annotations  # Needed to mention class itself in class / member function definition
+
+
 class QRModule(object):
     """
     A "Pixel" in regular QR codes.
@@ -42,6 +45,14 @@ class QRModule(object):
             self.value = self.off_value
         elif self.off_value == self.value:
             self.value = self.on_value
+
+    def get_as_char(self):
+        if self.on_value == self.value:
+            return 'B'
+        elif self.off_value == self.value:
+            return 'W'
+        else:
+            return 'N'
 
     @staticmethod
     def on() -> QRModule:
