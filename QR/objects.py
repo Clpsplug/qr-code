@@ -211,14 +211,33 @@ class FormatInfo(QRMatrix):
         self.value[8, 8] = QRModule.from_condition(type_info[7])
         self.value[8, 7] = QRModule.from_condition(type_info[6])
 
+    @staticmethod
+    def get_name_from_error_type(error_type: int):
+        if FormatInfo.ERROR_LOW == error_type:
+            return "LOW"
+        elif FormatInfo.ERROR_MEDIUM == error_type:
+            return "MEDIUM"
+        elif FormatInfo.ERROR_QUALITY == error_type:
+            return "QUALITY"
+        elif FormatInfo.ERROR_HIGH == error_type:
+            return "HIGH"
+        else:
+            return "Invalid"
+
 
 def create_8bit_data_code(raw_text: str, data_code_capacity: int) -> List:
     length = len(raw_text)
-    header = convert_int_to_bool_array(0x4, 4)
+    if length + 2 > data_code_capacity:
+        raise ValueError("Data too long! You cannot fit {0} ({1}-char long text) into {2}-code long data code!".format(
+            raw_text, length, data_code_capacity
+        ))
+    header = convert_int_to_bool_array(0x4, 4)  # constant
     header += convert_int_to_bool_array(length, 8)
     text_ascii_bytes = []
+    # In case of 8-bit mode, just convert chars into ascii codes.
     for char in raw_text:
         text_ascii_bytes += convert_int_to_bool_array(ord(char), 8)
+    # This is just an 'endcode' - 0b0000
     text_ascii_bytes += convert_int_to_bool_array(0, 4)
 
     total_bits = header + text_ascii_bytes
@@ -242,6 +261,73 @@ def create_8bit_data_code(raw_text: str, data_code_capacity: int) -> List:
             data_codes.append(0xec)
         else:
             # encoded_data = encoded_data + convert_int_to_bool_array(0x11, 8)
+            data_codes.append(0x11)
+        count += 1
+
+    return data_codes
+
+
+def create_alphanumeric_data_code(raw_text: str, text_capacity: int, data_code_capacity: int) -> List:
+    char_id_dict = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
+    length = len(raw_text)
+    encoded_data = convert_int_to_bool_array(2, 4) + convert_int_to_bool_array(length, 9)  # constant
+    raw_text_buffer = raw_text
+    while True:
+        # char cutout
+        char_pair = raw_text_buffer[0:2]
+        raw_text_buffer = raw_text_buffer[2:]
+
+        if 2 == len(char_pair):
+            # If two chars can be obtained...
+            first_id = char_id_dict.find(char_pair[0])
+            second_id = char_id_dict.find(char_pair[1])
+            total = first_id * 45 + second_id
+            partial_data = convert_int_to_bool_array(total, 11)
+        else:
+            # If only one char is remaining...
+            char_id = char_id_dict.find(char_pair[0])
+            partial_data = convert_int_to_bool_array(char_id, 6)
+
+        encoded_data = encoded_data + partial_data
+        if 0 == len(raw_text_buffer):
+            break
+
+    # If the length of the raw text is less than text capacity, we need to add '0000'
+    if length < text_capacity:
+        for _ in range(4):
+            encoded_data.append(False)
+
+    # We then try to separate the encoded data into 8-bit slices.
+    # Converting this back to integer will give us the 'DATA CODEs'
+    # with which we will need to calculate the error correction code.
+    count = 0
+    data_codes = []
+    while True:
+        slice = encoded_data[8 * count:8 * (count + 1)]
+        # print(slice)
+        if 0 == len(slice):
+            break
+        if 8 != len(slice):
+            # insufficient slice will be padded with False
+            while 8 != len(slice):
+                encoded_data.append(False)  # also append to encoded data
+                slice.append(False)
+        total = 0
+        for i in range(8):
+            total += pow(2, 7 - i) if slice[i] else 0
+        data_codes.append(total)
+        count += 1
+
+    # If the number of DATA CODES is less than data code capacity,
+    # We need to add 0b11101100 and 0b00010001 alternatively
+    # until we reach the 9 data code limit.
+    count = 0
+    while data_code_capacity > len(data_codes):
+        if 0 == count % 2:
+            encoded_data = encoded_data + convert_int_to_bool_array(0xec, 8)
+            data_codes.append(0xec)
+        else:
+            encoded_data = encoded_data + convert_int_to_bool_array(0x11, 8)
             data_codes.append(0x11)
         count += 1
 
@@ -284,11 +370,11 @@ def place_data(base: QRMatrix, raw_data_code: List, rs_block_info: List, error_c
     binary_code = []
     # First, interleave all the rs_blocks.
     code_index = 0
+    # earlier RS blocks may run out of data code at the end. in such case, carry on.
     while True:
         continue_count = 0
         for block_id in range(len(rs_blocks)):
             if code_index >= len(rs_blocks[block_id]):
-                # earlier RS blocks may run out of data code at the end. in such case, carry on.
                 continue_count += 1
                 continue
             binary = convert_int_to_bool_array(rs_blocks[block_id][code_index], 8)

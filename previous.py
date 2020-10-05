@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # ↓↓↓↓↓↓↓↓↓ This is the raw text
 
-    text = "CLPSPLUG"
+    text = "ABCDEF"
 
     # ↑↑↑↑↑↑↑↑↑ Edit this to get different QR.
 
@@ -351,7 +351,7 @@ if __name__ == '__main__':
 
     for r in range(21):
         for c in range(21):
-            if 0 == (r + c) % 3:
+            if 0 == (((r * c) % 3 + ((r + c) % 2)) % 2):
                 data_buffer[r, c].flip()
 
     # Type information
@@ -361,7 +361,7 @@ if __name__ == '__main__':
     metadata = convert_int_to_bool_array(0b10, 2)
 
     # Then we append the mask number...
-    metadata = metadata + convert_int_to_bool_array(0b011, 3)
+    metadata = metadata + convert_int_to_bool_array(0b111, 3)
 
     # and this 5-bit data is also error-coded by 10-bit code.
     meta_fx = list(map(lambda b: 1 if b else 0, metadata)) + [0] * 10

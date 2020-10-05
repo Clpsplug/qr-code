@@ -63,7 +63,7 @@ def i_galois_division(i_fx_input: List, e_gx: List) -> List:
                 i_fx[j] = 0
 
         if i_fx[0] != 0:
-            print("Oops?")
+            print("Oops? This may indicate a calculation failure.")
         if i_fx[-1] != 0:
             i_fx.pop(0)
             print("Calculation reached the end, exiting!")
