@@ -14,7 +14,8 @@ if __name__ == '__main__':
 
     qr_matrix.place(MiniPositionMarker.create(), -9, -9)
 
-    format_info = FormatInfo(version=2, error_level=FormatInfo.ERROR_LOW, mask_pattern=7)
+    mask_id = 7
+    format_info = FormatInfo(version=2, error_level=FormatInfo.ERROR_LOW, mask_pattern=mask_id)
 
     qr_matrix.merge(format_info)
 
@@ -26,7 +27,7 @@ if __name__ == '__main__':
 
     data_matrix = place_data(base=qr_matrix, raw_data_code=encoded_text,
                              rs_block_info=[(34, 1)], error_code_word_count=10,
-                             mask_id=3)
+                             mask_id=mask_id)
 
     with open('output-base.csv', 'w') as fp:
         writer = csv.writer(fp)

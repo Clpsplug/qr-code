@@ -7,6 +7,8 @@ import copy
 from typing import List
 
 import numpy as np
+import reedsolo as rs
+from reedsolo import RSCodec
 
 from QR.calculations import bch_15_5_division, i_galois_division, i_pad_codes, GaloisDividerDictionary, MaskPattern
 from QR.numpy import QRM
@@ -360,12 +362,21 @@ def place_data(base: QRMatrix, raw_data_code: List, rs_block_info: List, error_c
             current_index = current_index + word_count
 
     # For each data code, calculate the error codes.
-    gx_word_count = int(error_code_word_count / len(rs_blocks))
+    ecc_word_count = int(error_code_word_count / len(rs_blocks))
     rs_block_error_codes = []
+
+    rs.init_tables(0x11d)
     for rs_block in rs_blocks:
-        i_fx = copy.deepcopy(rs_block)
-        i_fx = i_pad_codes(i_fx, gx_word_count)
-        rs_block_error_codes.append(i_galois_division(i_fx, GaloisDividerDictionary.get_divider_for(gx_word_count)))
+        total_length = len(rs_block) + ecc_word_count
+        gen = rs.rs_generator_poly_all(total_length)
+        mesecc = rs.rs_encode_msg(rs_block, ecc_word_count, gen=gen[ecc_word_count])
+
+        print([x for x in gen[ecc_word_count]])
+
+        rs_block_error_codes.append(mesecc)
+        # i_fx = copy.deepcopy(rs_block)
+        # i_fx = i_pad_codes(i_fx, gx_word_count)
+        # rs_block_error_codes.append(i_galois_division(i_fx, GaloisDividerDictionary.get_divider_for(gx_word_count)))
 
     binary_code = []
     # First, interleave all the rs_blocks.
@@ -374,18 +385,28 @@ def place_data(base: QRMatrix, raw_data_code: List, rs_block_info: List, error_c
     while True:
         continue_count = 0
         for block_id in range(len(rs_blocks)):
-            if code_index >= len(rs_blocks[block_id]):
+            if code_index >= len(rs_block_error_codes[block_id]):
                 continue_count += 1
                 continue
-            binary = convert_int_to_bool_array(rs_blocks[block_id][code_index], 8)
+            binary = convert_int_to_bool_array(rs_block_error_codes[block_id][code_index], 8)
             binary_code += binary
         if continue_count == len(rs_blocks):
             break
         code_index += 1
 
-    error_area_start_index = len(binary_code)
+    i_rs_block_error_codes = [x for x in rs_block_error_codes[0]]
+    print(i_rs_block_error_codes)
+
+    # +) 25*25 All matrix
+    # -) 8*8*3 Placement Pattern
+    # -) 5*5   Mini Placement Pattern
+    # -) 9*2   Timing pattern
+    # -) 15*2  Metadata
+
+    error_area_start_index = len(data_code)*8
 
     # Then, we interleave all the rs_block_error_codes.
+    """
     code_index = 0
     while True:
         continue_count = 0
@@ -398,6 +419,7 @@ def place_data(base: QRMatrix, raw_data_code: List, rs_block_info: List, error_c
         if continue_count == len(rs_block_error_codes):
             break
         code_index += 1
+    """
 
     data_buffer = QRMatrix(version=base.version)
 
@@ -435,6 +457,7 @@ def place_data(base: QRMatrix, raw_data_code: List, rs_block_info: List, error_c
                                                                                                                  "up" if is_going_up else "down"))
         # Place the data here
         assert base.value[r, c].is_null()
+        assert data_buffer.value[r, c].is_null()
         # For masking reason, data will be saved in different place
         data_buffer.value[r, c] = QRModule.from_condition(binary_code[code_index])
         # increment the index
@@ -507,9 +530,15 @@ def place_data(base: QRMatrix, raw_data_code: List, rs_block_info: List, error_c
             # Some modules may not be used (e.g. Ver.5-Q, Binary mode.)
             # 'True vacancy,' which is occupied by neither data nor metadata,
             # seems to be treated as ON module - but we don't know for sure.
-            if base.value[r, c].is_null() and data_buffer.value[r, c].is_null():
-                data_buffer.value[r, c] = QRModule.on()
+            if not base.value[r, c].is_null():
+                # We do not flip base value stuff.
+                continue
+            if data_buffer.value[r, c].is_null():
+                print("Null value detected at R: {0}, C: {1}, padded as True".format(r, c))
+                data_buffer.value[r, c] = QRModule.off()
             if MaskPattern.calculate(r, c, mask_id):
+                if data_buffer.value[r, c].is_null():
+                    print("Null value detected at R: {0}, C: {1}".format(r, c))
                 data_buffer.value[r, c].flip()
 
     return data_buffer

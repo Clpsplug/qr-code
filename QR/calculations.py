@@ -120,7 +120,7 @@ class MaskPattern:
     }
 
     @staticmethod
-    def calculate(r, c, pattern_id: int):
+    def calculate(r, c, pattern_id: int) -> bool:
         return MaskPattern.data[pattern_id](r, c)
 
 
